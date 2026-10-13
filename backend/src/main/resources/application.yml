@@ -1,0 +1,27 @@
+spring:
+  datasource:
+    url: jdbc:postgresql://localhost:5432/storeit
+    username: storeit
+    password: storeit
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    open-in-view: false
+  flyway:
+    enabled: true
+
+app:
+  jwt:
+    secret: storeit-jwt-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256
+    access-token-expiry: 900       # 15 minutes (seconds)
+    refresh-token-expiry: 604800   # 7 days (seconds)
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+server:
+  port: 8080

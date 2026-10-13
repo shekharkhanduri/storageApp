@@ -7,8 +7,8 @@ import { Input } from "@/components/ui/input";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getFiles } from "@/lib/actions/file.actions";
 import { Models } from "node-appwrite";
-import Thumbnail from "@/components/Thumbnail";
-import FormattedDateTime from "@/components/FormattedDateTime";
+import Thumbnail from "@/components/files/Thumbnail";
+import FormattedDateTime from "@/components/common/FormattedDateTime";
 import { useDebounce } from "use-debounce";
 const Search = () => {
   const [query, setQuery] = useState("");

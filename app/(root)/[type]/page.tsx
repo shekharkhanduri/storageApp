@@ -1,8 +1,8 @@
 import React from "react";
-import Sort from "@/components/Sort";
+import Sort from "@/components/search/Sort";
 import { getFiles } from "@/lib/actions/file.actions";
 import { Models } from "node-appwrite";
-import Card from "@/components/Card";
+import Card from "@/components/files/Card";
 import { getFileTypesParams } from "@/lib/utils";
 
 const Page = async ({ searchParams, params }: SearchParamProps) => {

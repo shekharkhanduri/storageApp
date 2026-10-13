@@ -1,6 +1,6 @@
 "use server";
 
-import { createAdminClient, createSessionClient } from "@/lib/appwrite";
+import { createAdminClient } from "@/lib/appwrite";
 import { InputFile } from "node-appwrite/file";
 import { appwriteConfig } from "@/lib/appwrite/config";
 import { ID, Models, Query } from "node-appwrite";
@@ -164,7 +164,7 @@ export const updateFileUsers = async ({
     revalidatePath(path);
     return parseStringify(updatedFile);
   } catch (error) {
-    handleError(error, "Failed to rename file");
+    handleError(error, "Failed to share file");
   }
 };
 
@@ -189,14 +189,14 @@ export const deleteFile = async ({
     revalidatePath(path);
     return parseStringify({ status: "success" });
   } catch (error) {
-    handleError(error, "Failed to rename file");
+    handleError(error, "Failed to delete file");
   }
 };
 
 // ============================== TOTAL FILE SPACE USED
 export async function getTotalSpaceUsed() {
   try {
-    const { databases } = await createSessionClient();
+    const { databases } = await createAdminClient();
     const currentUser = await getCurrentUser();
     if (!currentUser) throw new Error("User is not authenticated.");
 
@@ -231,6 +231,6 @@ export async function getTotalSpaceUsed() {
 
     return parseStringify(totalSpace);
   } catch (error) {
-    handleError(error, "Error calculating total space used:, ");
+    handleError(error, "Error calculating total space used: ");
   }
 }

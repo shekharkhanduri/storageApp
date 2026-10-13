@@ -1,143 +1,154 @@
 "use server";
 
-import { createAdminClient, createSessionClient } from "@/lib/appwrite";
-import { appwriteConfig } from "@/lib/appwrite/config";
-import { Query, ID } from "node-appwrite";
-import { parseStringify } from "@/lib/utils";
 import { cookies } from "next/headers";
 import { avatarPlaceholderUrl } from "@/constants";
 import { redirect } from "next/navigation";
+import { parseStringify } from "@/lib/utils";
+import {
+  ACCESS_TOKEN_COOKIE,
+  REFRESH_TOKEN_COOKIE,
+} from "@/lib/api/client";
+import {
+  loginRequest,
+  logoutRequest,
+  meRequest,
+  refreshRequest,
+  registerRequest,
+  type BackendUser,
+} from "@/lib/api/auth.api";
+import { clearAuthCookies, setAuthCookies } from "@/lib/auth/cookies";
 
-const getUserByEmail = async (email: string) => {
-  const { databases } = await createAdminClient();
-
-  const result = await databases.listDocuments(
-    appwriteConfig.databaseId,
-    appwriteConfig.usersCollectionId,
-    [Query.equal("email", [email])],
-  );
-
-  return result.total > 0 ? result.documents[0] : null;
-};
-
-const handleError = (error: unknown, message: string) => {
-  console.log(error, message);
-  throw error;
-};
-
-export const sendEmailOTP = async ({ email }: { email: string }) => {
-  const { account } = await createAdminClient();
-
-  try {
-    const session = await account.createEmailToken(ID.unique(), email);
-
-    return session.userId;
-  } catch (error) {
-    handleError(error, "Failed to send email OTP");
-  }
-};
+const toCardUser = (user: BackendUser) =>
+  parseStringify({
+    $id: user.id,
+    accountId: user.id,
+    email: user.email,
+    fullName: user.fullName,
+    avatar: user.avatarUrl || avatarPlaceholderUrl,
+  });
 
 export const createAccount = async ({
   fullName,
   email,
+  password,
 }: {
   fullName: string;
   email: string;
-}) => {
-  const existingUser = await getUserByEmail(email);
-
-  const accountId = await sendEmailOTP({ email });
-  if (!accountId) throw new Error("Failed to send an OTP");
-
-  if (!existingUser) {
-    const { databases } = await createAdminClient();
-
-    await databases.createDocument(
-      appwriteConfig.databaseId,
-      appwriteConfig.usersCollectionId,
-      ID.unique(),
-      {
-        fullName,
-        email,
-        avatar: avatarPlaceholderUrl,
-        accountId,
-      },
-    );
-  }
-
-  return parseStringify({ accountId });
-};
-
-export const verifySecret = async ({
-  accountId,
-  password,
-}: {
-  accountId: string;
-  password: string;
+  password?: string;
 }) => {
   try {
-    const { account } = await createAdminClient();
+    const { res, data } = await registerRequest({ fullName, email, password });
 
-    const session = await account.createSession(accountId, password);
+    if (!res.ok || !data) {
+      return parseStringify({
+        error:
+          (data as { message?: string } | null)?.message ||
+          "Registration failed",
+      });
+    }
 
-    (await cookies()).set("appwrite-session", session.secret, {
-      path: "/",
-      httpOnly: true,
-      sameSite: "strict",
-      secure: true,
-    });
-
-    return parseStringify({ sessionId: session.$id });
+    await setAuthCookies(data.accessToken, data.refreshToken);
+    return parseStringify({ user: data.user });
   } catch (error) {
-    handleError(error, "Failed to verify OTP");
+    console.error("Registration error:", error);
+    return parseStringify({
+      error: "Failed to connect to authentication server",
+    });
   }
+};
+
+export const signInUser = async ({
+  email,
+  password,
+}: {
+  email: string;
+  password?: string;
+}) => {
+  try {
+    const { res, data } = await loginRequest({ email, password });
+
+    if (!res.ok || !data) {
+      return parseStringify({
+        error:
+          (data as { message?: string } | null)?.message ||
+          "Invalid email or password",
+      });
+    }
+
+    await setAuthCookies(data.accessToken, data.refreshToken);
+    return parseStringify({ user: data.user });
+  } catch (error) {
+    console.error("Sign-in error:", error);
+    return parseStringify({
+      error: "Failed to connect to authentication server",
+    });
+  }
+};
+
+const fetchMeWithRefresh = async (
+  accessToken: string | undefined,
+  refreshToken: string | undefined,
+) => {
+  if (!accessToken && !refreshToken) return null;
+
+  let token = accessToken;
+
+  if (!token && refreshToken) {
+    const { res, data } = await refreshRequest(refreshToken);
+    if (!res.ok || !data?.accessToken) return null;
+    token = data.accessToken;
+    await setAuthCookies(token, data.refreshToken ?? refreshToken);
+  }
+
+  const { res, data } = await meRequest(token!);
+  if (res.ok && data) return data;
+
+  if (res.status === 401 && refreshToken) {
+    const { res: refreshRes, data: refreshData } =
+      await refreshRequest(refreshToken);
+    if (!refreshRes.ok || !refreshData?.accessToken) return null;
+    await setAuthCookies(
+      refreshData.accessToken,
+      refreshData.refreshToken ?? refreshToken,
+    );
+    const { res: retryRes, data: retryData } = await meRequest(
+      refreshData.accessToken,
+    );
+    if (retryRes.ok && retryData) return retryData;
+  }
+
+  return null;
 };
 
 export const getCurrentUser = async () => {
   try {
-    const { databases, account } = await createSessionClient();
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
+    const refreshToken = cookieStore.get(REFRESH_TOKEN_COOKIE)?.value;
 
-    const result = await account.get();
+    const user = await fetchMeWithRefresh(accessToken, refreshToken);
+    if (!user) return null;
 
-    const user = await databases.listDocuments(
-      appwriteConfig.databaseId,
-      appwriteConfig.usersCollectionId,
-      [Query.equal("accountId", result.$id)],
-    );
-
-    if (user.total <= 0) return null;
-
-    return parseStringify(user.documents[0]);
+    return toCardUser(user);
   } catch (error) {
-    console.log(error);
+    console.error("Error fetching current user:", error);
+    return null;
   }
 };
 
 export const signOutUser = async () => {
-  const { account } = await createSessionClient();
-
   try {
-    await account.deleteSession("current");
-    (await cookies()).delete("appwrite-session");
-  } catch (error) {
-    handleError(error, "Failed to sign out user");
-  } finally {
-    redirect("/sign-in");
-  }
-};
+    const cookieStore = await cookies();
+    const accessToken = cookieStore.get(ACCESS_TOKEN_COOKIE)?.value;
 
-export const signInUser = async ({ email }: { email: string }) => {
-  try {
-    const existingUser = await getUserByEmail(email);
-
-    // User exists, send OTP
-    if (existingUser) {
-      await sendEmailOTP({ email });
-      return parseStringify({ accountId: existingUser.accountId });
+    if (accessToken) {
+      await logoutRequest(accessToken);
     }
 
-    return parseStringify({ accountId: null, error: "User not found" });
+    await clearAuthCookies();
   } catch (error) {
-    handleError(error, "Failed to sign in user");
+    console.error("Sign-out error:", error);
+  } finally {
+    redirect("/sign-in");
   }
 };

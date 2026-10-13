@@ -14,7 +14,7 @@ import { navItems } from "@/constants";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import FileUploader from "@/components/FileUploader";
+import FileUploader from "@/components/files/FileUploader";
 import { signOutUser } from "@/lib/actions/user.actions";
 
 interface Props {
