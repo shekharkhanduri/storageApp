@@ -19,23 +19,33 @@ export const setAuthCookies = async (
   accessToken: string,
   refreshToken?: string,
 ) => {
-  const cookieStore = await cookies();
+  try {
+    const cookieStore = await cookies();
 
-  cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, {
-    ...baseOptions,
-    maxAge: ACCESS_TOKEN_MAX_AGE,
-  });
-
-  if (refreshToken) {
-    cookieStore.set(REFRESH_TOKEN_COOKIE, refreshToken, {
+    cookieStore.set(ACCESS_TOKEN_COOKIE, accessToken, {
       ...baseOptions,
-      maxAge: REFRESH_TOKEN_MAX_AGE,
+      maxAge: ACCESS_TOKEN_MAX_AGE,
     });
+
+    if (refreshToken) {
+      cookieStore.set(REFRESH_TOKEN_COOKIE, refreshToken, {
+        ...baseOptions,
+        maxAge: REFRESH_TOKEN_MAX_AGE,
+      });
+    }
+  } catch {
+    // Next.js restricts cookie mutation during Server Component rendering.
+    // In Server Actions or Route Handlers, cookieStore.set succeeds.
+    // In Server Components, we catch and continue with the in-memory refreshed token.
   }
 };
 
 export const clearAuthCookies = async () => {
-  const cookieStore = await cookies();
-  cookieStore.delete(ACCESS_TOKEN_COOKIE);
-  cookieStore.delete(REFRESH_TOKEN_COOKIE);
+  try {
+    const cookieStore = await cookies();
+    cookieStore.delete(ACCESS_TOKEN_COOKIE);
+    cookieStore.delete(REFRESH_TOKEN_COOKIE);
+  } catch {
+    // Next.js restricts cookie mutation during Server Component rendering.
+  }
 };

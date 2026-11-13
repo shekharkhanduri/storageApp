@@ -10,7 +10,8 @@ import Thumbnail from "@/components/files/Thumbnail";
 import { MAX_FILE_SIZE } from "@/constants";
 import { useToast } from "@/hooks/use-toast";
 import { uploadFile } from "@/lib/actions/file.actions";
-import { usePathname } from "next/navigation";
+import { uploadFileToMinio } from "@/lib/files/minio-upload";
+import { usePathname, useRouter } from "next/navigation";
 
 interface Props {
   ownerId: string;
@@ -20,18 +21,25 @@ interface Props {
 
 const FileUploader = ({ ownerId, accountId, className }: Props) => {
   const path = usePathname();
+  const router = useRouter();
   const { toast } = useToast();
   const [files, setFiles] = useState<File[]>([]);
+  const [storageBackend, setStorageBackend] =
+    useState<StorageBackend>("appwrite");
+
+  const removeFile = (fileName: string) => {
+    setFiles((prevFiles) => prevFiles.filter((f) => f.name !== fileName));
+  };
 
   const onDrop = useCallback(
     async (acceptedFiles: File[]) => {
       setFiles(acceptedFiles);
 
+      let uploadedAny = false;
+
       const uploadPromises = acceptedFiles.map(async (file) => {
         if (file.size > MAX_FILE_SIZE) {
-          setFiles((prevFiles) =>
-            prevFiles.filter((f) => f.name !== file.name),
-          );
+          removeFile(file.name);
 
           return toast({
             description: (
@@ -44,20 +52,59 @@ const FileUploader = ({ ownerId, accountId, className }: Props) => {
           });
         }
 
-        return uploadFile({ file, ownerId, accountId, path }).then(
-          (uploadedFile) => {
-            if (uploadedFile) {
-              setFiles((prevFiles) =>
-                prevFiles.filter((f) => f.name !== file.name),
-              );
+        try {
+          if (storageBackend === "minio") {
+            const result = await uploadFileToMinio({ file, path });
+
+            if (result.success) {
+              uploadedAny = true;
+              removeFile(file.name);
+            } else {
+              removeFile(file.name);
+              toast({
+                description: (
+                  <p className="body-2 text-white">
+                    Failed to upload{" "}
+                    <span className="font-semibold">{file.name}</span> to MinIO.
+                  </p>
+                ),
+                className: "error-toast",
+              });
             }
-          },
-        );
+
+            return;
+          }
+
+          const uploadedFile = await uploadFile({
+            file,
+            ownerId,
+            accountId,
+            path,
+          });
+
+          if (uploadedFile) {
+            uploadedAny = true;
+            removeFile(file.name);
+          }
+        } catch {
+          removeFile(file.name);
+          toast({
+            description: (
+              <p className="body-2 text-white">
+                Failed to upload{" "}
+                <span className="font-semibold">{file.name}</span>.
+              </p>
+            ),
+            className: "error-toast",
+          });
+        }
       });
 
       await Promise.all(uploadPromises);
+
+      if (uploadedAny) router.refresh();
     },
-    [ownerId, accountId, path],
+    [ownerId, accountId, path, storageBackend, router, toast],
   );
 
   const { getRootProps, getInputProps } = useDropzone({ onDrop });
@@ -67,21 +114,54 @@ const FileUploader = ({ ownerId, accountId, className }: Props) => {
     fileName: string,
   ) => {
     e.stopPropagation();
-    setFiles((prevFiles) => prevFiles.filter((file) => file.name !== fileName));
+    removeFile(fileName);
+  };
+
+  const selectBackend = (
+    e: React.MouseEvent<HTMLButtonElement>,
+    backend: StorageBackend,
+  ) => {
+    e.stopPropagation();
+    setStorageBackend(backend);
   };
 
   return (
     <div {...getRootProps()} className="cursor-pointer">
       <input {...getInputProps()} />
-      <Button type="button" className={cn("uploader-button", className)}>
-        <Image
-          src="/assets/icons/upload.svg"
-          alt="upload"
-          width={24}
-          height={24}
-        />{" "}
-        <p>Upload</p>
-      </Button>
+      <div className="flex items-center gap-2">
+        <div
+          className="flex rounded-full border border-white/15 bg-white/5 p-0.5"
+          onClick={(e) => e.stopPropagation()}
+          aria-label="Storage backend"
+        >
+          {(["appwrite", "minio"] as StorageBackend[]).map((backend) => (
+            <button
+              key={backend}
+              type="button"
+              aria-pressed={storageBackend === backend}
+              onClick={(e) => selectBackend(e, backend)}
+              className={cn(
+                "rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-wide transition",
+                storageBackend === backend
+                  ? "bg-white text-dark-100"
+                  : "text-light-200 hover:text-white",
+              )}
+            >
+              {backend}
+            </button>
+          ))}
+        </div>
+
+        <Button type="button" className={cn("uploader-button", className)}>
+          <Image
+            src="/assets/icons/upload.svg"
+            alt="upload"
+            width={24}
+            height={24}
+          />{" "}
+          <p>Upload</p>
+        </Button>
+      </div>
       {files.length > 0 && (
         <ul className="uploader-preview-list">
           <h4 className="h4 text-light-100">Uploading</h4>

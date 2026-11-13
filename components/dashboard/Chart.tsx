@@ -18,18 +18,31 @@ import {
 import { ChartConfig, ChartContainer } from "@/components/ui/chart";
 import { calculatePercentage, convertFileSize } from "@/lib/utils";
 
-const chartConfig = {
-  size: {
-    label: "Size",
-  },
-  used: {
-    label: "Used",
-    color: "white",
-  },
-} satisfies ChartConfig;
+const DEFAULT_TOTAL = 2 * 1024 * 1024 * 1024;
 
-export const Chart = ({ used = 0 }: { used: number }) => {
-  const chartData = [{ storage: "used", 10: used, fill: "white" }];
+export const Chart = ({
+  used = 0,
+  total = DEFAULT_TOTAL,
+  label = "Available",
+  color = "white",
+}: {
+  used?: number;
+  total?: number;
+  label?: string;
+  color?: string;
+}) => {
+  const chartConfig = {
+    size: {
+      label: "Size",
+    },
+    used: {
+      label: "Used",
+      color,
+    },
+  } satisfies ChartConfig;
+
+  const chartData = [{ storage: "used", 10: used, fill: color }];
+  const percentage = calculatePercentage(used, total);
 
   return (
     <Card className="chart">
@@ -38,7 +51,7 @@ export const Chart = ({ used = 0 }: { used: number }) => {
           <RadialBarChart
             data={chartData}
             startAngle={90}
-            endAngle={Number(calculatePercentage(used)) + 90}
+            endAngle={percentage + 90}
             innerRadius={80}
             outerRadius={110}
           >
@@ -66,19 +79,14 @@ export const Chart = ({ used = 0 }: { used: number }) => {
                           y={viewBox.cy}
                           className="chart-total-percentage"
                         >
-                          {used && calculatePercentage(used)
-                            ? calculatePercentage(used)
-                                .toString()
-                                .replace(/^0+/, "")
-                            : "0"}
-                          %
+                          {percentage.toString().replace(/^0+/, "")}%
                         </tspan>
                         <tspan
                           x={viewBox.cx}
                           y={(viewBox.cy || 0) + 24}
                           className="fill-white/70"
                         >
-                          Space used
+                          {label} used
                         </tspan>
                       </text>
                     );
@@ -90,9 +98,9 @@ export const Chart = ({ used = 0 }: { used: number }) => {
         </ChartContainer>
       </CardContent>
       <CardHeader className="chart-details">
-        <CardTitle className="chart-title">Available Storage</CardTitle>
+        <CardTitle className="chart-title">{label} Storage</CardTitle>
         <CardDescription className="chart-description">
-          {used ? convertFileSize(used) : "2GB"} / 2GB
+          {used ? convertFileSize(used) : "0 Bytes"} / {convertFileSize(total)}
         </CardDescription>
       </CardHeader>
     </Card>

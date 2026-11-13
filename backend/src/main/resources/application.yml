@@ -18,6 +18,13 @@ app:
     secret: storeit-jwt-secret-key-must-be-at-least-256-bits-long-for-hmac-sha256
     access-token-expiry: 900       # 15 minutes (seconds)
     refresh-token-expiry: 604800   # 7 days (seconds)
+  minio:
+    endpoint: http://localhost:9000
+    access-key: minioadmin
+    secret-key: minioadmin
+    bucket: storeit-files
+    presigned-url-expiry: 900      # 15 min for PUT
+    download-url-expiry: 300       # 5 min for GET
 
 springdoc:
   swagger-ui:

@@ -38,11 +38,15 @@ const Sidebar = ({ fullName, avatar, email }: Props) => {
       <nav className="sidebar-nav">
         <ul className="flex flex-1 flex-col gap-6">
           {navItems.map(({ url, name, icon }) => (
-            <Link key={name} href={url} className="lg:w-full">
+            <Link
+              key={name}
+              href={url}
+              className="lg:w-full rounded-xl lg:rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand/50 focus-visible:ring-offset-2"
+            >
               <li
                 className={cn(
-                  "sidebar-nav-item",
-                  pathname === url && "shad-active",
+                  "sidebar-nav-item hover:bg-brand/5 transition-colors",
+                  pathname === url && "shad-active hover:bg-brand",
                 )}
               >
                 <Image
@@ -55,7 +59,9 @@ const Sidebar = ({ fullName, avatar, email }: Props) => {
                     pathname === url && "nav-icon-active",
                   )}
                 />
-                <p className="hidden lg:block">{name}</p>
+                <p className={cn("hidden lg:block", pathname === url ? "text-white" : "text-light-100 font-medium")}>
+                  {name}
+                </p>
               </li>
             </Link>
           ))}
@@ -64,10 +70,10 @@ const Sidebar = ({ fullName, avatar, email }: Props) => {
 
       <Image
         src="/assets/images/files-2.png"
-        alt="logo"
+        alt="illustration"
         width={506}
         height={418}
-        className="w-full"
+        className="w-full hidden xl:block object-contain max-h-[220px]"
       />
 
       <div className="sidebar-user-info">

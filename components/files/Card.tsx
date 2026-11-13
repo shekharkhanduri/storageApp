@@ -1,11 +1,11 @@
-import { Models } from "node-appwrite";
 import Link from "next/link";
 import Thumbnail from "@/components/files/Thumbnail";
 import { convertFileSize } from "@/lib/utils";
 import FormattedDateTime from "@/components/common/FormattedDateTime";
 import ActionDropdown from "@/components/files/ActionDropdown";
+import { StorageBadge } from "@/components/files/StorageBadge";
 
-const Card = ({ file }: { file: Models.Document }) => {
+const Card = ({ file }: { file: UnifiedFile }) => {
   return (
     <Link href={file.url} target="_blank" className="file-card">
       <div className="flex justify-between">
@@ -15,11 +15,15 @@ const Card = ({ file }: { file: Models.Document }) => {
           url={file.url}
           className="!size-20"
           imageClassName="!size-11"
+          unoptimized={file.storageBackend === "minio"}
         />
 
         <div className="flex flex-col items-end justify-between">
           <ActionDropdown file={file} />
-          <p className="body-1">{convertFileSize(file.size)}</p>
+          <div className="flex flex-col items-end gap-1">
+            <StorageBadge backend={file.storageBackend} />
+            <p className="body-1">{convertFileSize(file.size)}</p>
+          </div>
         </div>
       </div>
 

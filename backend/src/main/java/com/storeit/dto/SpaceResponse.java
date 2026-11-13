@@ -1,0 +1,16 @@
+package com.storeit.dto;
+
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
+
+@Data
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class SpaceResponse {
+
+    private long usedBytes;
+    private long totalBytes;
+}

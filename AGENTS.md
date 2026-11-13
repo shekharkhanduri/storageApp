@@ -83,14 +83,19 @@ NEXT_APPWRITE_KEY="standard_... (secret, rotate if exposed)"
 - Dev: `/usr/bin/npm run dev` → `http://localhost:3000` (Turbopack; redirects to `/sign-in`).
 - Build/start: `/usr/bin/npm run build`, `/usr/bin/npm start`. Lint: `/usr/bin/npm run lint`
   (build ignores TS/ESLint per `next.config.ts`).
+- Frontend tests: `/usr/bin/npm test` (Vitest + Testing Library, files under `__tests__/`).
 - Always `rm -rf .next` after `.env.local` or `next.config.ts` changes.
 
 ## Local gotchas (already applied — do not revert)
 - `package.json` has NO `"type"`/`"main"`/`"directories"` (a `"type":"commonjs"` breaks
   ESM `import/export` in dev).
 - `next.config.ts` `images.remotePatterns` includes `cdn.pixabay.com`,
-  `img.freepik.com`, `cloud.appwrite.io`, AND `fra.cloud.appwrite.io`.
+  `img.freepik.com`, `cloud.appwrite.io`, `fra.cloud.appwrite.io`, and
+  `localhost:9000` / `127.0.0.1:9000` for MinIO presigned previews.
 - `components/FileUploader.tsx` GIF `Image` uses `unoptimized` (animated `file-loader.gif`).
+- Host has **Podman, not Docker**; run containers with `podman run` or install
+  `podman-compose`. `minio/minio` and `quay.io/minio/minio` are not pullable;
+  use `docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z` (S3-compatible).
 
 ## Smoke test
 1. `/sign-up` → email → OTP modal → verify → `/` dashboard (empty chart first run).
@@ -115,6 +120,33 @@ NEXT_APPWRITE_KEY="standard_... (secret, rotate if exposed)"
 - Flow: browser requests upload → backend creates PENDING record + presigned PUT URL →
   browser uploads directly to MinIO → backend verifies/marks ACTIVE; downloads via
   presigned GET URL after authorization check. Basic file listing, rename, delete.
+
+### Backend status (implemented)
+- All auth + file endpoints under `/api/auth` and `/api/files` are implemented in
+  `backend/` (Flyway `V1`+`V2`, S3 presigned PUT/GET, orphan cleanup, sharing).
+- `FileDto` is frontend-ready: includes presigned `url`, `ownerName`, `ownerEmail`,
+  and `storageBackend: "minio"`; `GET /api/files?type=video,audio` supports multiple
+  types; listing returns owned **and** shared-with-me files.
+- Unit tests: `JAVA_HOME=$PWD/backend/.tools/jdk-21 ./backend/mvnw -f backend/pom.xml test`
+  (Testcontainers tests are tagged `integration` and excluded by default).
+  Run integration tests with
+  `./mvnw test -Dgroups=integration -DexcludedGroups=` when Docker is available.
+- MinIO CORS is set via `MINIO_API_CORS_ALLOW_ORIGIN=http://localhost:3000` in
+  `backend/docker-compose.yml` so the browser can PUT/GET presigned URLs directly.
+
+### Frontend status (implemented)
+- Hybrid storage: Appwrite remains the default; the uploader has an
+  `Appwrite | MinIO` segmented toggle. MinIO uploads go browser → presigned PUT →
+  `confirm`, never through the Next.js server.
+- `types/index.d.ts` has `UnifiedFile` + `GetFilesResult`; `lib/files/unified.ts`
+  maps/sorts/summarizes both sources. `lib/actions/file.actions.ts` exposes
+  `getAppwriteFiles`, `getMinioFiles`, merged `getFiles`, MinIO mutations, and
+  `getTotalSpaceUsed` returning `{ appwrite, minio }`.
+- Data stays separate: dashboard renders two charts and two type-summary lists;
+  cards/recent files show an `Appwrite`/`MinIO` badge. Search and type pages merge
+  results for one grid but retain per-file backend identity.
+- Frontend tests are isolated under `__tests__/` (`lib/unified`, `Card`,
+  `Chart`, `StorageBadge`, `FileUploader`) and run with `/usr/bin/npm test`.
 
 ## Architecture (Full Design)
 
@@ -261,9 +293,11 @@ config.setAllowCredentials(true);
 Presigned URLs are used **by the browser**, so MinIO must be reachable from the host:
 ```yaml
 # docker-compose.yml
+# Official MinIO images are not anonymously pullable in 2026; use the
+# MinIO-compatible Silo fork (same S3 API, env vars, and console).
 services:
   minio:
-    image: minio/minio
+    image: docker.io/pgsty/silo:RELEASE.2026-09-16T00-00-00Z
     ports:
       - "9000:9000"   # S3 API — browser + backend both use this
       - "9001:9001"   # MinIO web console (admin UI)

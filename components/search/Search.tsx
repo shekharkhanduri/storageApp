@@ -6,7 +6,6 @@ import Image from "next/image";
 import { Input } from "@/components/ui/input";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { getFiles } from "@/lib/actions/file.actions";
-import { Models } from "node-appwrite";
 import Thumbnail from "@/components/files/Thumbnail";
 import FormattedDateTime from "@/components/common/FormattedDateTime";
 import { useDebounce } from "use-debounce";
@@ -14,7 +13,7 @@ const Search = () => {
   const [query, setQuery] = useState("");
   const searchParams = useSearchParams();
   const searchQuery = searchParams.get("query") || "";
-  const [results, setResults] = useState<Models.Document[]>([]);
+  const [results, setResults] = useState<UnifiedFile[]>([]);
   const [open, setOpen] = useState(false);
   const router = useRouter();
   const path = usePathname();
@@ -42,7 +41,7 @@ const Search = () => {
     }
   }, [searchQuery]);
 
-  const handleClickItem = (file: Models.Document) => {
+  const handleClickItem = (file: UnifiedFile) => {
     setOpen(false);
     setResults([]);
 
@@ -73,7 +72,7 @@ const Search = () => {
               results.map((file) => (
                 <li
                   className="flex items-center justify-between"
-                  key={file.$id}
+                  key={`${file.storageBackend}-${file.$id}`}
                   onClick={() => handleClickItem(file)}
                 >
                   <div className="flex cursor-pointer items-center gap-4">
@@ -82,6 +81,7 @@ const Search = () => {
                       extension={file.extension}
                       url={file.url}
                       className="size-9 min-w-9"
+                      unoptimized={file.storageBackend === "minio"}
                     />
                     <p className="subtitle-2 line-clamp-1 text-light-100">
                       {file.name}

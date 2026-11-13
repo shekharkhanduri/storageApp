@@ -1,6 +1,45 @@
 /* eslint-disable no-unused-vars */
 
 declare type FileType = "document" | "image" | "video" | "audio" | "other";
+declare type StorageBackend = "appwrite" | "minio";
+
+declare interface UnifiedOwner {
+  fullName: string;
+  email?: string;
+}
+
+declare interface UnifiedFile {
+  $id: string;
+  name: string;
+  type: FileType;
+  extension: string;
+  size: number;
+  url: string;
+  $createdAt: string;
+  $updatedAt: string;
+  owner: UnifiedOwner;
+  users: string[];
+  bucketFileId?: string;
+  storageBackend: StorageBackend;
+}
+
+declare interface GetFilesResult {
+  documents: UnifiedFile[];
+  total: number;
+  appwrite: { documents: UnifiedFile[]; total: number };
+  minio: { documents: UnifiedFile[]; total: number; available: boolean };
+}
+
+declare interface SpaceSummary {
+  image: { size: number; latestDate: string };
+  document: { size: number; latestDate: string };
+  video: { size: number; latestDate: string };
+  audio: { size: number; latestDate: string };
+  other: { size: number; latestDate: string };
+  used: number;
+  all: number;
+  available: boolean;
+}
 
 declare interface ActionType {
   label: string;
@@ -67,10 +106,11 @@ declare interface ThumbnailProps {
   url: string;
   className?: string;
   imageClassName?: string;
+  unoptimized?: boolean;
 }
 
 declare interface ShareInputProps {
-  file: Models.Document;
+  file: UnifiedFile;
   onInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onRemove: (email: string) => void;
 }

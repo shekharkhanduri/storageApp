@@ -192,7 +192,7 @@
 
   /* Sidebar & MobileNavigation */
   .nav-icon {
-    @apply w-6 filter invert opacity-25 !important;
+    @apply w-6 filter invert opacity-60 transition-opacity !important;
   }
   .nav-icon-active {
     @apply invert-0 opacity-100 !important;

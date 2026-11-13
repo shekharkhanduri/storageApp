@@ -29,6 +29,15 @@ public class GlobalExceptionHandler {
                 .build());
     }
 
+    @ExceptionHandler(ForbiddenException.class)
+    public ResponseEntity<ErrorResponse> handleForbidden(ForbiddenException ex) {
+        return ResponseEntity.status(403).body(ErrorResponse.builder()
+                .status(403)
+                .message(ex.getMessage())
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
     @ExceptionHandler(IllegalArgumentException.class)
     public ResponseEntity<ErrorResponse> handleIllegalArgument(IllegalArgumentException ex) {
         return ResponseEntity.status(400).body(ErrorResponse.builder()
@@ -46,6 +55,15 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(400).body(ErrorResponse.builder()
                 .status(400)
                 .message(message)
+                .timestamp(LocalDateTime.now())
+                .build());
+    }
+
+    @ExceptionHandler(StorageException.class)
+    public ResponseEntity<ErrorResponse> handleStorage(StorageException ex) {
+        return ResponseEntity.status(500).body(ErrorResponse.builder()
+                .status(500)
+                .message(ex.getMessage())
                 .timestamp(LocalDateTime.now())
                 .build());
     }

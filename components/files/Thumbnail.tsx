@@ -8,6 +8,7 @@ interface Props {
   url?: string;
   imageClassName?: string;
   className?: string;
+  unoptimized?: boolean;
 }
 
 export const Thumbnail = ({
@@ -16,8 +17,13 @@ export const Thumbnail = ({
   url = "",
   imageClassName,
   className,
+  unoptimized = false,
 }: Props) => {
-  const isImage = type === "image" && extension !== "svg";
+  const isImage =
+    type === "image" &&
+    extension !== "svg" &&
+    extension !== "heic" &&
+    extension !== "heif";
 
   return (
     <figure className={cn("thumbnail", className)}>
@@ -26,6 +32,7 @@ export const Thumbnail = ({
         alt="thumbnail"
         width={100}
         height={100}
+        unoptimized={unoptimized}
         className={cn(
           "size-8 object-contain",
           imageClassName,

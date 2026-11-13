@@ -24,10 +24,24 @@ export const convertFileSize = (sizeInBytes: number, digits?: number) => {
   }
 };
 
-export const calculatePercentage = (sizeInBytes: number) => {
-  const totalSizeInBytes = 2 * 1024 * 1024 * 1024; // 2GB in bytes
+export const calculatePercentage = (
+  sizeInBytes: number,
+  totalSizeInBytes = 2 * 1024 * 1024 * 1024,
+) => {
+  if (totalSizeInBytes <= 0 || !sizeInBytes || isNaN(sizeInBytes)) return 0;
   const percentage = (sizeInBytes / totalSizeInBytes) * 100;
   return Number(percentage.toFixed(2));
+};
+
+export const formatPercentage = (percentage: number | null | undefined): string => {
+  if (percentage === null || percentage === undefined || isNaN(percentage)) {
+    return "0%";
+  }
+  if (percentage === 0) return "0%";
+  if (percentage < 0.1) return "<0.1%";
+  // If e.g. 0.05, format with leading 0, not .05%
+  const formatted = percentage.toFixed(1).replace(/\.0$/, "");
+  return `${formatted}%`;
 };
 
 export const getFileType = (fileName: string) => {
@@ -62,7 +76,17 @@ export const getFileType = (fileName: string) => {
     "afphoto",
     "afphoto",
   ];
-  const imageExtensions = ["jpg", "jpeg", "png", "gif", "bmp", "svg", "webp"];
+  const imageExtensions = [
+    "jpg",
+    "jpeg",
+    "png",
+    "gif",
+    "bmp",
+    "svg",
+    "webp",
+    "heic",
+    "heif",
+  ];
   const videoExtensions = ["mp4", "avi", "mov", "mkv", "webm"];
   const audioExtensions = ["mp3", "wav", "ogg", "flac"];
 
@@ -75,8 +99,29 @@ export const getFileType = (fileName: string) => {
   return { type: "other", extension };
 };
 
+export const formatRelativeTime = (isoString: string | null | undefined): string => {
+  if (!isoString) return "";
+  const date = new Date(isoString);
+  const now = new Date();
+  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return "just now";
+  const diffInMinutes = Math.floor(diffInSeconds / 60);
+  if (diffInMinutes < 60) {
+    return `${diffInMinutes} minute${diffInMinutes > 1 ? "s" : ""} ago`;
+  }
+  const diffInHours = Math.floor(diffInMinutes / 60);
+  if (diffInHours < 24) {
+    return `${diffInHours} hour${diffInHours > 1 ? "s" : ""} ago`;
+  }
+  const diffInDays = Math.floor(diffInHours / 24);
+  if (diffInDays < 7) {
+    return `${diffInDays} day${diffInDays > 1 ? "s" : ""} ago`;
+  }
+  return formatDateTime(isoString);
+};
+
 export const formatDateTime = (isoString: string | null | undefined) => {
-  if (!isoString) return "—";
 
   const date = new Date(isoString);
 
@@ -183,7 +228,7 @@ export const constructDownloadUrl = (bucketFileId: string) => {
 };
 
 // DASHBOARD UTILS
-export const getUsageSummary = (totalSpace: any) => {
+export const getUsageSummary = (totalSpace: SpaceSummary) => {
   return [
     {
       title: "Documents",

@@ -1,9 +1,10 @@
 import React from "react";
 import Sort from "@/components/search/Sort";
 import { getFiles } from "@/lib/actions/file.actions";
-import { Models } from "node-appwrite";
 import Card from "@/components/files/Card";
-import { getFileTypesParams } from "@/lib/utils";
+import { convertFileSize, getFileTypesParams } from "@/lib/utils";
+
+export const dynamic = "force-dynamic";
 
 const Page = async ({ searchParams, params }: SearchParamProps) => {
   const type = ((await params)?.type as string) || "";
@@ -13,6 +14,10 @@ const Page = async ({ searchParams, params }: SearchParamProps) => {
   const types = getFileTypesParams(type) as FileType[];
 
   const files = await getFiles({ types, searchText, sort });
+  const totalSize = files.documents.reduce(
+    (total, file) => total + file.size,
+    0,
+  );
 
   return (
     <div className="page-container">
@@ -21,7 +26,7 @@ const Page = async ({ searchParams, params }: SearchParamProps) => {
 
         <div className="total-size-section">
           <p className="body-1">
-            Total: <span className="h5">0 MB</span>
+            Total: <span className="h5">{convertFileSize(totalSize)}</span>
           </p>
 
           <div className="sort-container">
@@ -33,10 +38,13 @@ const Page = async ({ searchParams, params }: SearchParamProps) => {
       </section>
 
       {/* Render the files */}
-      {files.total > 0 ? (
+      {files.documents.length > 0 ? (
         <section className="file-list">
-          {files.documents.map((file: Models.Document) => (
-            <Card key={file.$id} file={file} />
+          {files.documents.map((file: UnifiedFile) => (
+            <Card
+              key={`${file.storageBackend}-${file.$id}`}
+              file={file}
+            />
           ))}
         </section>
       ) : (

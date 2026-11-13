@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useState } from "react";
 import Image from "next/image";
-import { Models } from "node-appwrite";
 import { actionsDropdownItems } from "@/constants";
 import Link from "next/link";
 import { constructDownloadUrl } from "@/lib/utils";
@@ -25,27 +24,40 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
   deleteFile,
+  deleteMinioFile,
+  getMinioDownloadUrl,
   renameFile,
+  renameMinioFile,
+  shareMinioFile,
   updateFileUsers,
 } from "@/lib/actions/file.actions";
 import { usePathname } from "next/navigation";
 import { FileDetails, ShareInput } from "@/components/files/ActionsModalContent";
 
-const ActionDropdown = ({ file }: { file: Models.Document }) => {
+const getBaseName = (name: string, extension: string) => {
+  if (extension && name.toLowerCase().endsWith(`.${extension.toLowerCase()}`)) {
+    return name.slice(0, -(extension.length + 1));
+  }
+
+  return name;
+};
+
+const ActionDropdown = ({ file }: { file: UnifiedFile }) => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [action, setAction] = useState<ActionType | null>(null);
-  const [name, setName] = useState(file.name);
+  const [name, setName] = useState(getBaseName(file.name, file.extension));
   const [isLoading, setIsLoading] = useState(false);
   const [emails, setEmails] = useState<string[]>([]);
 
   const path = usePathname();
+  const isMinio = file.storageBackend === "minio";
 
   const closeAllModals = () => {
     setIsModalOpen(false);
     setIsDropdownOpen(false);
     setAction(null);
-    setName(file.name);
+    setName(getBaseName(file.name, file.extension));
     //   setEmails([]);
   };
 
@@ -54,15 +66,56 @@ const ActionDropdown = ({ file }: { file: Models.Document }) => {
     setIsLoading(true);
     let success = false;
 
-    const actions = {
-      rename: () =>
-        renameFile({ fileId: file.$id, name, extension: file.extension, path }),
-      share: () => updateFileUsers({ fileId: file.$id, emails, path }),
-      delete: () =>
-        deleteFile({ fileId: file.$id, bucketFileId: file.bucketFileId, path }),
-    };
+    if (action.value === "rename") {
+      if (isMinio) {
+        const result = await renameMinioFile({
+          fileId: file.$id,
+          name,
+          extension: file.extension,
+          path,
+        });
+        success = result.success;
+      } else {
+        success = Boolean(
+          await renameFile({
+            fileId: file.$id,
+            name,
+            extension: file.extension,
+            path,
+          }),
+        );
+      }
+    }
 
-    success = await actions[action.value as keyof typeof actions]();
+    if (action.value === "share") {
+      if (isMinio) {
+        const result = await shareMinioFile({
+          fileId: file.$id,
+          emails,
+          path,
+        });
+        success = result.success;
+      } else {
+        success = Boolean(
+          await updateFileUsers({ fileId: file.$id, emails, path }),
+        );
+      }
+    }
+
+    if (action.value === "delete") {
+      if (isMinio) {
+        const result = await deleteMinioFile({ fileId: file.$id, path });
+        success = result.success;
+      } else if (file.bucketFileId) {
+        success = Boolean(
+          await deleteFile({
+            fileId: file.$id,
+            bucketFileId: file.bucketFileId,
+            path,
+          }),
+        );
+      }
+    }
 
     if (success) closeAllModals();
 
@@ -72,14 +125,35 @@ const ActionDropdown = ({ file }: { file: Models.Document }) => {
   const handleRemoveUser = async (email: string) => {
     const updatedEmails = emails.filter((e) => e !== email);
 
-    const success = await updateFileUsers({
-      fileId: file.$id,
-      emails: updatedEmails,
-      path,
-    });
+    if (isMinio) {
+      const result = await shareMinioFile({
+        fileId: file.$id,
+        emails: updatedEmails,
+        path,
+      });
 
-    if (success) setEmails(updatedEmails);
+      if (result.success) setEmails(updatedEmails);
+    } else {
+      const success = await updateFileUsers({
+        fileId: file.$id,
+        emails: updatedEmails,
+        path,
+      });
+
+      if (success) setEmails(updatedEmails);
+    }
+
     closeAllModals();
+  };
+
+  const handleDownload = async (
+    event: React.MouseEvent<HTMLButtonElement>,
+  ) => {
+    event.preventDefault();
+    event.stopPropagation();
+
+    const url = await getMinioDownloadUrl(file.$id);
+    if (url) window.location.assign(url);
   };
 
   const renderDialogContent = () => {
@@ -171,19 +245,35 @@ const ActionDropdown = ({ file }: { file: Models.Document }) => {
               }}
             >
               {actionItem.value === "download" ? (
-                <Link
-                  href={constructDownloadUrl(file.bucketFileId)}
-                  download={file.name}
-                  className="flex items-center gap-2"
-                >
-                  <Image
-                    src={actionItem.icon}
-                    alt={actionItem.label}
-                    width={30}
-                    height={30}
-                  />
-                  {actionItem.label}
-                </Link>
+                isMinio ? (
+                  <button
+                    type="button"
+                    onClick={handleDownload}
+                    className="flex items-center gap-2"
+                  >
+                    <Image
+                      src={actionItem.icon}
+                      alt={actionItem.label}
+                      width={30}
+                      height={30}
+                    />
+                    {actionItem.label}
+                  </button>
+                ) : (
+                  <Link
+                    href={constructDownloadUrl(file.bucketFileId || "")}
+                    download={file.name}
+                    className="flex items-center gap-2"
+                  >
+                    <Image
+                      src={actionItem.icon}
+                      alt={actionItem.label}
+                      width={30}
+                      height={30}
+                    />
+                    {actionItem.label}
+                  </Link>
+                )
               ) : (
                 <div className="flex items-center gap-2">
                   <Image
